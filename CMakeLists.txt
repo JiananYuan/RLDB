@@ -70,7 +70,8 @@ else(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
 
   # Disable C++ exceptions.
   string(REGEX REPLACE "-fexceptions" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-exceptions")
+  # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-exceptions")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 
   # Disable RTTI.
   string(REGEX REPLACE "-frtti" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
@@ -190,6 +191,12 @@ target_sources(leveldb
     "util/options.cc"
     "util/random.h"
     "util/status.cc"
+    "mod/timer/stats.cpp"
+    "mod/timer/stats.h"
+    "mod/timer/timer.cpp"
+    "mod/timer/timer.h"
+    "mod/data/data.cc"
+    "mod/data/data.h"
 
   # Only CMake 3.3+ supports PUBLIC sources in targets exported by "install".
   $<$<VERSION_GREATER:CMAKE_VERSION,3.2>:PUBLIC>
@@ -396,6 +403,7 @@ if(LEVELDB_BUILD_TESTS)
   if(NOT BUILD_SHARED_LIBS)
     # TODO(costan): This test also uses
     #               "util/env_{posix|windows}_test_helper.h"
+    leveldb_test("mod/test/motivation.cc")
     if (WIN32)
       leveldb_test("util/env_windows_test.cc")
     else (WIN32)

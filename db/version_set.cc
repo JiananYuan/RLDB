@@ -18,6 +18,9 @@
 #include "table/two_level_iterator.h"
 #include "util/coding.h"
 #include "util/logging.h"
+#include "mod/timer/stats.h"
+#include "mod/data/data.h"
+#include <chrono>
 
 namespace leveldb {
 
@@ -283,6 +286,10 @@ void Version::ForEachOverlapping(Slice user_key, Slice internal_key, void* arg,
   const Comparator* ucmp = vset_->icmp_.user_comparator();
 
   // Search level-0 in order from newest to oldest.
+  auto st_time = high_resolution_clock::now();
+  auto en_time = high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<nanoseconds>(en_time - st_time).count();
+
   std::vector<FileMetaData*> tmp;
   tmp.reserve(files_[0].size());
   for (uint32_t i = 0; i < files_[0].size(); i++) {
@@ -296,15 +303,25 @@ void Version::ForEachOverlapping(Slice user_key, Slice internal_key, void* arg,
     std::sort(tmp.begin(), tmp.end(), NewestFirst);
     for (uint32_t i = 0; i < tmp.size(); i++) {
       if (!(*func)(arg, 0, tmp[i])) {
+        en_time = high_resolution_clock::now();
+        duration = std::chrono::duration_cast<nanoseconds>(en_time - st_time).count();
+        adgMod::query_latency += duration;
+        adgMod::level_query_latency[2] += adgMod::query_latency;
+        adgMod::level_query_count[2] += 1;
         return;
       }
     }
   }
+  en_time = high_resolution_clock::now();
+  duration = std::chrono::duration_cast<nanoseconds>(en_time - st_time).count();
+  adgMod::query_latency += duration;
 
   // Search other levels.
   for (int level = 1; level < config::kNumLevels; level++) {
     size_t num_files = files_[level].size();
     if (num_files == 0) continue;
+
+    st_time = high_resolution_clock::now();
 
     // Binary search to find earliest index whose largest key >= internal_key.
     uint32_t index = FindFile(vset_->icmp_, files_[level], internal_key);
@@ -314,10 +331,19 @@ void Version::ForEachOverlapping(Slice user_key, Slice internal_key, void* arg,
         // All of "f" is past any data for user_key
       } else {
         if (!(*func)(arg, level, f)) {
+          en_time = high_resolution_clock::now();
+          duration = std::chrono::duration_cast<nanoseconds>(en_time - st_time).count();
+          adgMod::query_latency += duration;
+          adgMod::level_query_latency[level + 2] += adgMod::query_latency;
+          adgMod::level_query_count[level + 2] += 1;
           return;
         }
       }
     }
+
+    en_time = high_resolution_clock::now();
+    duration = std::chrono::duration_cast<nanoseconds>(en_time - st_time).count();
+    adgMod::query_latency += duration;
   }
 }
 
@@ -395,6 +421,12 @@ Status Version::Get(const ReadOptions& options, const LookupKey& k,
   state.saver.value = value;
 
   ForEachOverlapping(state.saver.user_key, state.ikey, &state, &State::Match);
+
+  if (!state.found) {
+    // 整个数据库中没有找到这个key
+    adgMod::level_query_latency[9] += adgMod::query_latency;
+    adgMod::level_query_count[9] += 1;
+  }
 
   return state.found ? state.s : Status::NotFound(Slice());
 }

@@ -34,6 +34,9 @@
 #include "util/coding.h"
 #include "util/logging.h"
 #include "util/mutexlock.h"
+#include "mod/timer/stats.h"
+#include "mod/data/data.h"
+#include <chrono>
 
 namespace leveldb {
 
@@ -1139,15 +1142,46 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
     mutex_.Unlock();
     // First look in the memtable, then in the immutable memtable (if any).
     LookupKey lkey(key, snapshot);
-    if (mem->Get(lkey, value, &s)) {
-      // Done
-    } else if (imm != nullptr && imm->Get(lkey, value, &s)) {
-      // Done
+
+    auto st_time = high_resolution_clock::now();
+    auto is_in_mem = mem->Get(lkey, value, &s);
+    auto en_time = high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<nanoseconds>(en_time - st_time).count();
+    adgMod::query_latency += duration;
+
+    bool is_in_imm = false;
+
+    if (is_in_mem) {
+      adgMod::level_query_latency[0] += adgMod::query_latency;
+      adgMod::level_query_count[0] += 1;
+      goto Done;
     } else {
-      s = current->Get(options, lkey, value, &stats);
-      have_stat_update = true;
+      if (imm != nullptr) {
+        st_time = high_resolution_clock::now();
+        is_in_imm = imm->Get(lkey, value, &s);
+        en_time = high_resolution_clock::now();
+        duration = std::chrono::duration_cast<nanoseconds>(en_time - st_time).count();
+        adgMod::query_latency += duration;
+      }
+      if (is_in_imm) {
+        adgMod::level_query_latency[1] += adgMod::query_latency;
+        adgMod::level_query_count[1] += 1;
+        goto Done;
+      } else {
+        s = current->Get(options, lkey, value, &stats);
+        have_stat_update = true;
+      }
     }
-    mutex_.Lock();
+
+    // if (mem->Get(lkey, value, &s)) {
+    //   // Done
+    // } else if (imm != nullptr && imm->Get(lkey, value, &s)) {
+    //   // Done
+    // } else {
+    //   s = current->Get(options, lkey, value, &stats);
+    //   have_stat_update = true;
+    // }
+    Done: mutex_.Lock();
   }
 
   if (have_stat_update && current->UpdateStats(stats)) {
