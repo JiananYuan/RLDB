@@ -12,6 +12,7 @@
 #include "helpers/memenv/memenv.h"
 #include "mod/timer/stats.h"
 #include "mod/data/data.h"
+#include "leveldb/filter_policy.h"
 
 using namespace leveldb;
 using namespace std;
@@ -58,7 +59,7 @@ int main(int argc, char** argv) {
     ("w,write_type", "write rand or seq", cxxopts::value<std::string>(write_type)->default_value("rand"))
     ("d,dataset_name", "name of the dataset", cxxopts::value<std::string>(ds_name)->default_value("books"))
     ("k, key_size", "byte size of the key", cxxopts::value<uint32_t>(key_size)->default_value("20"))
-    ("v, value_size", "byte size of the value", cxxopts::value<uint32_t>(value_size)->default_value("64"))
+    ("v, value_size", "byte size of the value", cxxopts::value<uint32_t>(value_size)->default_value("500"))
     ("o, output_file", "path of result output file", cxxopts::value<std::string>(exp_log_file)->default_value("log"))
     ("r, range_query", "use range query", cxxopts::value<bool>(range_query)->default_value("false"))
     ("s, start_type", "start type id", cxxopts::value<int>(start_type)->default_value("3"))
@@ -88,6 +89,7 @@ int main(int argc, char** argv) {
   // options.write_buffer_size = 64 * 1024 * 1024;
   // options.compression = kNoCompression;
   // options.paranoid_checks = false;
+	options.filter_policy = NewBloomFilterPolicy(10);
 
   ReadOptions read_options = ReadOptions();
   WriteOptions write_options = WriteOptions();
@@ -143,8 +145,8 @@ int main(int argc, char** argv) {
         break;
       case 3:
         std::cout << "[3/4] testing-4 (read-only)... " << std::endl;
-        // in.open(ds_zipf_query);
-				in.open(ds_rand_query);
+        in.open(ds_zipf_query);
+				// in.open(ds_rand_query);
         break;
     }
 		double ops_time = 0;
@@ -204,7 +206,7 @@ int main(int argc, char** argv) {
 		if (kOps != 0) {
 			std::cout << "\n";
 			std::sort(latencies.begin(), latencies.end());
-			// if (exist_not_found)    std::cout << "exist not found" << std::endl;
+			if (exist_not_found)    std::cout << "exist not found" << std::endl;
 			std::cout << "average operate time : " << ops_time / num_real_ops << " ns" << std::endl;
 			// exp_log << "average operate time : " << ops_time / num_real_ops << " ns" << std::endl;
 			// std::cout << "average operate throughput : " << num_real_ops / (ops_time / 1e9) << " ops" << std::endl;
@@ -219,13 +221,13 @@ int main(int argc, char** argv) {
 			// }
 			for (uint8_t i = 0; i < 10; i += 1) {
 				if (i == 0) {
-					std::cout << "Mem: ";
+					std::cout << "Mem: #" << adgMod::level_query_count[i] << " ";
 				} else if (i == 1) {
-					std::cout << "Imm: ";
-				} else if (i >= 2 && i < 8) {
-					std::cout << "L" << i - 2 << ": ";
+					std::cout << "Imm: #" << adgMod::level_query_count[i] << " ";
+				} else if (i >= 2 && i < 9) {
+					std::cout << "L" << i - 2 << ": #" << adgMod::level_query_count[i] << " ";
 				} else {
-					std::cout << "Not Found: ";
+					std::cout << "Not Found: #" << adgMod::level_query_count[i] << " ";
 				}
 				std::cout << adgMod::level_query_latency[i] / adgMod::level_query_count[i] << " ns" << std::endl;
 			}

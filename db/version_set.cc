@@ -292,6 +292,9 @@ void Version::ForEachOverlapping(Slice user_key, Slice internal_key, void* arg,
 
   std::vector<FileMetaData*> tmp;
   tmp.reserve(files_[0].size());
+
+  st_time = high_resolution_clock::now();
+  
   for (uint32_t i = 0; i < files_[0].size(); i++) {
     FileMetaData* f = files_[0][i];
     if (ucmp->Compare(user_key, f->smallest.user_key()) >= 0 &&

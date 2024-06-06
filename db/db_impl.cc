@@ -1154,7 +1154,6 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
     if (is_in_mem) {
       adgMod::level_query_latency[0] += adgMod::query_latency;
       adgMod::level_query_count[0] += 1;
-      goto Done;
     } else {
       if (imm != nullptr) {
         st_time = high_resolution_clock::now();
@@ -1166,7 +1165,6 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
       if (is_in_imm) {
         adgMod::level_query_latency[1] += adgMod::query_latency;
         adgMod::level_query_count[1] += 1;
-        goto Done;
       } else {
         s = current->Get(options, lkey, value, &stats);
         have_stat_update = true;
@@ -1181,7 +1179,7 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
     //   s = current->Get(options, lkey, value, &stats);
     //   have_stat_update = true;
     // }
-    Done: mutex_.Lock();
+    mutex_.Lock();
   }
 
   if (have_stat_update && current->UpdateStats(stats)) {
